@@ -51,6 +51,7 @@ idmissing <- anti_join(idpred.demo, outcome, by = "id")
 idmissing <- idmissing[,-1]
 idmissing <- model.matrix(~ .,idmissing)[,-1]
 write.csv(idmissing, "idmissing.csv")
+idob <- idall[, 109:126]
 
 q2 <- idall[,2:108]
 ```
@@ -64,7 +65,7 @@ Output one csv file: output1.csv should contain one matrix element. The first co
 
 ## ridge regression:
 X = model.matrix( ~ ., q2)[, -1]
-Y = idall$O1
+Y = idob$O1
 
 fit_ridge = glmnet(X, Y, alpha = 0)
 plot(fit_ridge)
@@ -81,7 +82,7 @@ sum(coef(fit_ridge_cv, s = "lambda.min")[-1] ^ 2) # penalty term for lambda mini
 coef(fit_ridge_cv, s = "lambda.1se")
 
 sum(coef(fit_ridge_cv, s = "lambda.1se")[-1] ^ 2) # penalty term for lambda one SE
-mean((y - predict(fit_ridge_cv, X)) ^ 2) # "train error"
+mean((Y - predict(fit_ridge_cv, X)) ^ 2) # "train error"
 
 sqrt(fit_ridge_cv$cvm) # CV-RMSEs
 sqrt(fit_ridge_cv$cvm[fit_ridge_cv$lambda == fit_ridge_cv$lambda.min]) # CV-RMSE minimum
@@ -101,7 +102,7 @@ fit_lasso_cv = cv.glmnet(X, Y, alpha = 1)
 plot(fit_lasso_cv)
 
 
-fit = glmnet(X, Y, alpha = 1, lambda = fit_lasso_cv$lambda.min )
+fit = glmnet(X, Y, alpha = 1, lambda = fit_lasso_cv$lambda.min)
 
 coef(fit_lasso_cv, s = "lambda.min")
 
@@ -111,7 +112,7 @@ coef(fit_lasso_cv, s = "lambda.1se")
 
 sum(abs(coef(fit_lasso_cv, s = "lambda.1se")[-1])) # penalty term for lambda one SE
 
-mean((y - predict(fit_lasso_cv, X)) ^ 2) # "train error"
+mean((Y - predict(fit_lasso_cv, X)) ^ 2) # "train error"
 
 sqrt(fit_lasso_cv$cvm)
 
@@ -122,6 +123,24 @@ sqrt(fit_lasso_cv$cvm[fit_lasso_cv$lambda == fit_lasso_cv$lambda.1se]) # CV-RMSE
 fit_lasso_final = glmnet(X, Y, alpha = 1, lambda = fit_lasso_cv$lambda.min)
 
 predict(fit_lasso_final, idmissing, type = "response")
+
+OB <- data.frame(matrix(NA, nrow = 303, ncol = 18))
+colnames(OB) <- paste("O",1:18, sep ="")
+total <- 0
+
+Opred <- function(X, Y, i){
+  fit.lasso <- cv.glmnet(X, Y, alpha = 1)
+  fit.1 <- glmnet(X, Y, alpha = 1, lambda = fit.lasso$lambda.min)
+  x<- predict(fit.1, idmissing, type = "response")
+  a <- min(fit.lasso$cvm)
+  list(cvm = a, predi = x)
+}
+
+for (i in 1:ncol(OB)) {
+  out <- Opred(X, idob[, i], i)
+  OB[,i] <- out$predi
+  total <- total + out$cvm
+}
 ```
 
 ```{r}
