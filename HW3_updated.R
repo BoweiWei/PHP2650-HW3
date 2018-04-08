@@ -6,6 +6,7 @@ authors <- function(){
 require(RSQLite) == T || install.packages("RSQLite", repos="https://cloud.r-project.org/")
 require(glmnet) == T || install.packages("glmnet", repos="https://cloud.r-project.org/")
 require(dplyr) == T || install.packages("RSQLite", repos="https://cloud.r-project.org/")
+require(data.table) == T || install.packages("data.table", repos="https://cloud.r-project.org/")
 
 ########################################################################## Question 1
 ## Input sqlite file and extract tables
@@ -42,7 +43,7 @@ test_mtx <- model.matrix(~ ., idmissing_data[, -1])[, -1]
 y <- train_comp[, 4:21]
 
 lasso_predict <- function(train, label, newx, 
-                          lambda_grid = 10^seq(-2,2, length=100) ){
+                          lambda_grid = 10^seq(-3,3, length=100) ){
   # function to cross validate lasso models to determine optimal lambda,
   # predict labels with the optimal model
   # output a list with predicted values along with cross validation error
@@ -85,3 +86,21 @@ write.csv(output3, "output3.csv",row.names=FALSE)
 ## There is no significant difference after adding 199 more predictors from the results above (a little bit improvement). More data will help to improve
 ## the prediction performance. But the improvement has marginal utility. The effective improvement introduced by additional data will
 ## decrease as data increase. Add small amount of data like pred2.csv provided won't be very helpful.
+
+########################################################################## Question 5
+library(data.table)
+pred3 = fread("pred3.csv")
+colnames(pred3) <- c("id", paste("V",305:45154, sep =""))
+train_mtx3 <- inner_join(data.frame(id = train$id, train_mtx), pred3, by = "id")[ ,-1]
+test_mtx3 <- inner_join(data.frame(id = idmissing_data$id, test_mtx), pred3, by = "id")[ ,-1]
+
+# train lasso models with additional large amount of predictors
+system.time(missingID_pred3 <- sapply( X=y, lasso_predict, train= as.matrix(train_mtx3), newx = as.matrix(test_mtx3)))
+
+# sum all cv error from the 18 models again
+cvm_pred3 <- sum(unlist(missingID_pred3[seq(2,36,2)]))
+
+output4 <- data.frame(id = idmissing, do.call(cbind,missingID_pred3[seq(1,35,2)]))
+colnames(output4)[-1] = paste("o",1:18, sep="")
+cat(paste("cv error of less predictors:",cvm_pred1,  "\ncv error of more predictors:", cvm_pred2), "\ncv error of additional large amount of predictors:", cvm_pred3))
+write.csv(output4, "output4.csv",row.names=FALSE)
